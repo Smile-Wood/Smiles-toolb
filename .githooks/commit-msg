@@ -1,0 +1,10 @@
+#!/bin/sh
+# 给每次提交自动追加 AI 协作署名。
+# 启用：git config core.hooksPath .githooks
+# 只在「末尾几行」判断是否已有 trailer，避免正文里提到这串字符就被误判。
+msg_file="$1"
+trailer="Co-authored-by: WorkBuddy <noreply@workbuddy.cn>"
+if tail -n 5 "$msg_file" | grep -qxF "$trailer"; then
+    exit 0
+fi
+printf '\n%s\n' "$trailer" >> "$msg_file"
