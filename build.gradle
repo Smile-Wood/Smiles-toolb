@@ -1,0 +1,116 @@
+plugins {
+	// 每个版本子工程都会应用一次这个共享脚本。
+	// Loom 版本写死在这里：plugins {} 块读不到 gradle.properties。
+	id 'net.fabricmc.fabric-loom-remap' version '1.19-SNAPSHOT'
+}
+
+// ---------------------------------------------------------------------------
+// 当前正在构建的版本节点（由 Stonecutter 注入）
+// ---------------------------------------------------------------------------
+def mcVersion = stonecutter.current.version
+def javaRelease = (property('deps.java_release') as String).toInteger()
+def modId = property('mod.id')
+
+// 配置界面改成库内预设后，toolb 侧不再引用任何 MC 类型（连 ModMenu 那个 Screen 也用
+// 动态代理避开了），所以**产物只有一个 jar**，1.20.1 ~ 26.2 共用。
+// Stonecutter 的 8 个节点保留，作用是「按各版本 MC 各编译一遍」的回归检查：
+// 谁要是往源码里塞了 net.minecraft 引用，对应节点会直接编译失败。
+// 发布用 `python tools/build_release.py`，它会挑一个节点产物并交叉核对其余节点。
+version = property('mod.version')
+group = property('mod.group')
+base.archivesName = property('mod.id')
+
+repositories {
+	// 前置库 Smile's Lib Box 按版本发布到 mavenLocal()
+	mavenLocal()
+	// Mod Menu 的 7.x / 11.x 只发在 Modrinth 的 maven 上
+	maven {
+		name = 'Modrinth'
+		url = 'https://api.modrinth.com/maven'
+	}
+	maven {
+		name = 'TerraformersMC'
+		url = 'https://maven.terraformersmc.com/releases/'
+	}
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	// 注意：不需要 refmap。这版 Loom 在 remapJar 时直接重映射 mixin 字节码里的
+	// 类名/字段名/方法名（产物里 EditBoxCursorAccessMixin 引用的是 field_2102，
+	// MalilibTextFieldMixin 的 method 是 method_1875），所以源码里正常写官方名即可。
+
+	mods {
+		"smile_toolb" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+dependencies {
+	// 关键：适配类与 mixin 用本节点的 MC 编译
+	minecraft "com.mojang:minecraft:${mcVersion}"
+	mappings loom.officialMojangMappings()
+	modImplementation "net.fabricmc:fabric-loader:${property('deps.fabric_loader')}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${property('deps.fabric_api')}"
+
+	// 前置库：配置界面预设、注入点（聊天草稿 / 上下文条 / 按键）与跨版本门面
+	modImplementation "smile_libbox:smile_libbox:${property('deps.libbox')}"
+
+	// Mod Menu：只为实现它那个「配置」按钮的入口，所以是 compileOnly ——
+	// 不写进 depends，玩家不装也能正常跑。开发环境额外放进 runtime 便于验证。
+	modCompileOnly("maven.modrinth:modmenu:${property('deps.modmenu')}") {
+		transitive = false
+	}
+	modLocalRuntime("maven.modrinth:modmenu:${property('deps.modmenu')}") {
+		transitive = false
+	}
+}
+
+// fabric.mod.json 里需要按节点替换的字段。
+// 范围不再按节点走：一个 jar 要覆盖 1.20.1 ~ 26.2，写死成宽范围；
+// 具体某个版本能不能跑由前置库 `smile_libbox` 的对应产物决定。
+def replaceMeta = [
+		version        : project.version,
+		minecraft_range: '>=1.20.1',
+		java_range     : '>=17',
+		mod_name       : property('mod.name'),
+		mod_authors    : property('mod.authors'),
+		mod_license    : property('mod.license')
+]
+
+processResources {
+	inputs.properties(replaceMeta)
+
+	filesMatching("fabric.mod.json") {
+		expand(replaceMeta)
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = javaRelease
+	it.options.encoding = 'UTF-8'
+}
+
+// 实机验证用：把自检开关透传给开发客户端 JVM。
+// 用法 ./gradlew :1.20.1:runClient -Dsmile_toolb.selftest.open_config=true
+tasks.withType(JavaExec).matching { it.name == 'runClient' }.configureEach {
+	systemProperty 'smile_toolb.selftest.open_config',
+			System.getProperty('smile_toolb.selftest.open_config', 'false')
+	// 调试 mixin 时用：./gradlew :1.20.1:runClient -Dmixin.debug.verbose=true
+	systemProperty 'mixin.debug.verbose', System.getProperty('mixin.debug.verbose', 'false')
+	systemProperty 'mixin.debug.export', System.getProperty('mixin.debug.export', 'false')
+}
+
+java {
+	sourceCompatibility = JavaVersion.toVersion(javaRelease)
+	targetCompatibility = JavaVersion.toVersion(javaRelease)
+}
+
+jar {
+	from("LICENSE") {
+		rename { "${it}_$modId" }
+	}
+}

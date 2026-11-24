@@ -1,0 +1,48 @@
+{
+	"schemaVersion": 1,
+	"id": "smile_toolb",
+	"version": "${version}",
+	"name": "${mod_name}",
+	"description": "把 Minecraft 讲述人的音色换成系统语音（含 Windows Natural HD / OneCore 音色），全程离线合成；配置界面是与原版同材质的页签式界面，由前置库按预设渲染。",
+	"authors": [
+		"${mod_authors}"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "${mod_license}",
+	"icon": "assets/smile_toolb/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"smile_toolb.SmileSToolb"
+		],
+		"client": [
+			"smile_toolb.client.SmileSToolbClient"
+		],
+		"modmenu": [
+			"smile_toolb.client.integration.ModMenuIntegration"
+		]
+	},
+	"mixins": [
+		{
+			"config": "smile_toolb.client.mixins.json",
+			"environment": "client"
+		},
+		{
+			"config": "smile_toolb.backport.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "${minecraft_range}",
+		"java": "${java_range}",
+		"fabric-api": "*",
+		"smile_libbox": ">=1.0.26"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}

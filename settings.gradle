@@ -1,0 +1,66 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+plugins {
+	// 每个游戏版本单独编译：mixin 与版本门控都要对着该版本的 MC 生成。
+	// 配置界面本身已经收进前置库，toolb 侧不再依赖任何 GUI 库。
+	id 'dev.kikugie.stonecutter' version '0.9.8'
+}
+
+stonecutter {
+	kotlinController = false
+	centralScript = 'build.gradle'
+
+	// toolb 源码零 net.minecraft 引用（版本相关的东西全在前置库的适配层里），
+	// 所以它只需要「一个基准节点 + 一个最新节点」两头夹逼，不需要每个版本各编一份：
+	//   1.20.1  —— 基准：Java 17 目标（class major 61），产物就从这里取；
+	//   1.21.11 —— 最新 intermediary 节点：最新的命名空间/API 下仍能编过、
+	//              字节码与基准逐字节相同，就说明这一份 jar 确实通用。
+	// 中间那 6 个节点（1.20.4/1.20.6/1.21.1/1.21.4/1.21.5/1.21.8）已归档到
+	// archived-versions/，需要时把 gradle.properties 拷回 versions/<版本>/ 并加进下面这行即可。
+	// 26.x 属于官方名代，由 lib 侧的 tools 脚本处理，因此不放进 Stonecutter。
+	create(getRootProject()) {
+		versions '1.20.1', '1.21.11'
+		vcsVersion = '1.20.1'
+	}
+}
+
+rootProject.name = 'smile_toolb'
+
+// ---------------------------------------------------------------------------
+// 根工程的 runClient / runServer 转发
+// ---------------------------------------------------------------------------
+// loom 只应用在版本子工程上，所以 runClient 只存在于 :1.20.1 / :1.21.11。
+// 但 IDEA 的「快速启动」会照着根 build.gradle 里的 loom {} 生成配置，任务写成
+// 全限定路径 `:runClient`，于是报 "not found in root project"。
+// 这里在根工程挂同名任务转发到基准节点：
+//   IDEA 快速启动（`:runClient`）      —— 只命中根工程这一个任务，正常启动 1.20.1
+//   命令行请写 `./gradlew :runClient`  —— 同样只有根工程
+// 注意：命令行**不要**写不带冒号的 `./gradlew runClient`，Gradle 的任务名匹配会
+// 把两个子工程的 runClient 一起选进任务图，等于连着拉两个客户端。
+// 要跑最新节点仍然显式写 `./gradlew :1.21.11:runClient`。
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    def baseline = root.findProject(':1.20.1')
+    if (baseline == null) {
+        return
+    }
+    ['runClient', 'runServer'].each { name ->
+        if (baseline.tasks.findByName(name) == null) {
+            return
+        }
+        root.tasks.register(name) {
+            group = 'fabric'
+            description = "转发到 :1.20.1:${name}（根工程不应用 loom，运行任务只在版本子工程里）"
+            dependsOn "${baseline.path}:${name}"
+        }
+    }
+}

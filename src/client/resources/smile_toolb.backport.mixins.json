@@ -1,0 +1,12 @@
+{
+	"required": false,
+	"package": "smile_toolb.client.mixin",
+	"compatibilityLevel": "JAVA_17",
+	"plugin": "smile_toolb.client.mixin.BackportMixinPlugin",
+	"client": [
+		"VanillaBackportBarMixin"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	}
+}
