@@ -38,6 +38,9 @@ verify26.log
 verify26.hits.txt
 verify26*.png
 
+# CI checks the prerequisite library out here to publish it to mavenLocal
+.libbox/
+
 # java
 
 hs_err_*.log

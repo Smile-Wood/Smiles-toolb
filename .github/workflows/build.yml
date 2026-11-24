@@ -1,7 +1,9 @@
-# Automatically build the project and run any configured tests for every push
-# and submitted pull request. This can help catch issues that only occur on
-# certain platforms or Java versions, and provides a first line of defence
-# against bad commits.
+# Two Stonecutter nodes (1.20.1 baseline + 1.21.11 latest) are built as a
+# regression check, then tools/build_release.py collapses them into the single
+# distributable jar and verifies the two nodes produce byte-identical classes.
+#
+# The mod does not ship the library, so the prerequisite library is built from
+# its own repository and published to mavenLocal first.
 
 name: build
 on: [pull_request, push]
@@ -12,6 +14,11 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
+      - name: checkout prerequisite library
+        uses: actions/checkout@v6
+        with:
+          repository: Smile-Wood/Smiles-Lib-Box
+          path: .libbox
       - name: validate gradle wrapper
         uses: gradle/actions/wrapper-validation@v6
       - name: setup jdk
@@ -20,11 +27,17 @@ jobs:
           java-version: '25'
           distribution: 'microsoft'
       - name: make gradle wrapper executable
-        run: chmod +x ./gradlew
-      - name: build
-        run: ./gradlew build
+        run: chmod +x ./gradlew .libbox/gradlew
+      - name: publish prerequisite library to mavenLocal
+        working-directory: .libbox
+        run: ./gradlew :1.20.1:publishToMavenLocal :1.21.11:publishToMavenLocal
+      - name: build both nodes
+        run: ./gradlew :1.20.1:build :1.21.11:build
+      - name: collapse nodes into the single distributable jar
+        run: python3 tools/build_release.py
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:
           name: Artifacts
-          path: build/libs/
+          path: build/libs/*.jar
+          if-no-files-found: error

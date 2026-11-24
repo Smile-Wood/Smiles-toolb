@@ -4,6 +4,11 @@ pluginManagement {
 			name = 'Fabric'
 			url = 'https://maven.fabricmc.net/'
 		}
+		// stonecutter 不在 Maven Central / 插件门户上，缺了这条 CI 会在解析插件时就失败
+		maven {
+			name = 'Kikugie'
+			url = 'https://maven.kikugie.dev/releases'
+		}
 		mavenCentral()
 		gradlePluginPortal()
 	}
