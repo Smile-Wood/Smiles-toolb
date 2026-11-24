@@ -847,4 +847,4 @@ Modrinth / Terraformers 仓库拉取，不需要手动准备。
 
 ## License
 
-This template is available under the CC0 license. Feel free to learn from it and incorporate it in your own projects.
+MIT — see [LICENSE](LICENSE).

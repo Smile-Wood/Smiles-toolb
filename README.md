@@ -838,4 +838,4 @@ In a real modpack use the JVM argument `-Dsmile_toolb.selftest.open_config=true`
 
 ## License
 
-This template is available under the CC0 license. Feel free to learn from it and incorporate it in your own projects.
+MIT — see [LICENSE](LICENSE).
